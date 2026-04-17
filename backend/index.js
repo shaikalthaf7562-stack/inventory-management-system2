@@ -140,13 +140,24 @@ const Order    = mongoose.model("Order",    orderSchema);
 // SEED: Default Admin Account
 // ─────────────────────────────────────────────
 async function seedAdmin() {
-  const exists = await User.findOne({ email: "admin@ims.com" });
+  const adminEmail = "admin@ims.com";
+  const defaultPass = "admin@2025";
+  const hashed = await bcrypt.hash(defaultPass, 10);
+  
+  const exists = await User.findOne({ email: adminEmail });
   if (!exists) {
-    const hashed = await bcrypt.hash("admin@2025", 10);
-    await User.create({ fullName: "System Admin", email: "admin@ims.com", password: hashed, role: "admin", isActive: true });
-    console.log("🔑 Default admin → admin@ims.com / admin@2025");
+    await User.create({ fullName: "System Admin", email: adminEmail, password: hashed, role: "admin", isActive: true });
+    console.log(`🔑 Created Admin Account → ${adminEmail} / ${defaultPass}`);
+  } else {
+    // Force update the password to make sure it's correct
+    exists.password = hashed;
+    exists.role = "admin";
+    exists.isActive = true;
+    await exists.save();
+    console.log(`🔑 Admin Password Reset Successfully → ${adminEmail} / ${defaultPass}`);
   }
 }
+
 
 // ─────────────────────────────────────────────
 // HELPERS
@@ -198,18 +209,35 @@ const canManage = (req, res, next) => {
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log(`📩 Login attempt for: ${email}`);
+    
     if (!email || !password) return res.status(400).json({ message: "Email and password required" });
+    
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    if (!user) {
+      console.log(`❌ User not found: ${email}`);
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+    
     if (!user.isActive) return res.status(403).json({ message: "Account deactivated. Contact admin." });
+    
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ message: "Invalid credentials" });
+    if (!match) {
+      console.log(`❌ Password mismatch for: ${email}`);
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+    
+    console.log(`✅ Login successful for: ${user.fullName}`);
     res.json({
       token: generateToken(user),
       user: { id: user._id, name: user.fullName, email: user.email, role: user.role, department: user.department, canManageInventory: user.canManageInventory },
     });
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) { 
+    console.error(`🔥 Login error: ${err.message}`);
+    res.status(500).json({ message: err.message }); 
+  }
 });
+
 
 // POST /api/auth/signup — public, creates "user" role (customer)
 app.post("/api/auth/signup", async (req, res) => {

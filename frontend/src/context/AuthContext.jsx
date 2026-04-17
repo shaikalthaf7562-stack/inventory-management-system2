@@ -12,7 +12,10 @@ const getBaseURL = () => {
 };
 
 
-axios.defaults.baseURL = getBaseURL();
+const baseURL = getBaseURL();
+console.log("🔗 API Base URL:", baseURL || "(relative)");
+axios.defaults.baseURL = baseURL;
+
 
 
 export const AuthProvider = ({ children }) => {
