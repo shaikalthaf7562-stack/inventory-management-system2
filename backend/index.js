@@ -13,10 +13,13 @@
 
 const express = require("express");
 const mongoose = require("mongoose");
+const dns = require("dns");
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const morgan = require("morgan");
+const path = require("path");
 require("dotenv").config();
 
 const app = express();
@@ -637,7 +640,30 @@ app.use((err, req, res, next) => {
 });
 
 // ─────────────────────────────────────────────
+// SERVE STATIC FRONTEND (PRODUCTION)
+// ─────────────────────────────────────────────
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../frontend/build")));
+
+  app.get("*", (req, res) =>
+    res.sendFile(path.resolve(__dirname, "..", "frontend", "build", "index.html"))
+  );
+} else {
+  app.get("/", (req, res) => {
+    res.send("API is running...");
+  });
+}
+
+// ─────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`
+🚀 Server is running!
+📅 Date: ${new Date().toLocaleString()}
+🔗 Local: http://localhost:${PORT}
+🌐 Network: http://<your-ipv4-address>:${PORT}
+  `);
+});
+
